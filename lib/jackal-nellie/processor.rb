@@ -69,8 +69,26 @@ module Jackal
             'NELLIE_GIT_REF' => payload.get(:data, :code_fetcher, :info, :reference)
           )
         )
+        commands = [payload.get(:data, :nellie, :commands)].flatten.compact
+        results = run_commands(commands, process_environment, payload)
+        payload.set(:data, :nellie, :history, results)
+        payload[:data][:nellie].delete(:commands)
+        payload[:data][:nellie].delete(:environment)
+        unless(payload.get(:data, :nellie, :result, :failed))
+          payload.set(:data, :nellie, :result, :complete, true)
+        end
+        true
+      end
+
+      # Run collection of commands
+      #
+      # @param commands [Array<String>] commands to execute
+      # @param env [Hash] environment variables for process
+      # @param payload [Smash]
+      # @return [Array<Smash>] command results ({:start_time, :stop_time, :exit_code, :logs, :timed_out})
+      def run_commands(commands, env, payload)
         results = []
-        [payload.get(:data, :nellie, :commands)].compact.flatten.each do |command|
+        commands.each do |command|
           process_manager.process(payload[:id], command) do |process|
             result = Smash.new
             stdout = process_manager.create_io_tmp(Celluloid.uuid, 'stdout')
@@ -104,13 +122,7 @@ module Jackal
           end
           break if payload.get(:data, :nellie, :result, :failed)
         end
-        payload.set(:data, :nellie, :history, results)
-        payload[:data][:nellie].delete(:commands)
-        payload[:data][:nellie].delete(:environment)
-        unless(payload.get(:data, :nellie, :result, :failed))
-          payload.set(:data, :nellie, :result, :complete, true)
-        end
-        true
+        results
       end
 
       # Extract nellie commands from repository file
