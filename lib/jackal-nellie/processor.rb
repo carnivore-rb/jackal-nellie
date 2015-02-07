@@ -42,7 +42,7 @@ module Jackal
       #
       # @param message [Carnivore::Message]
       def execute(message)
-        failure_wrap(message) do
+        failure_wrap(message) do |payload|
           debug "Processing nellie payload!"
           nellie_cwd = fetch_code(payload)
           unless(payload.get(:data, :nellie, :commands))
@@ -95,7 +95,7 @@ module Jackal
             stderr = process_manager.create_io_tmp(Celluloid.uuid, 'stderr')
             process.io.stdout = stdout
             process.io.stderr = stderr
-            process.environment.replace(process_environment.dup)
+            process.environment.replace(env.dup)
             process.leader = true
             result[:start_time] = Time.now.to_i
             process.start
@@ -113,9 +113,10 @@ module Jackal
               io.rewind
               asset_store.put(key, io)
               result.set(:logs, type, key)
-              io.delete
+              io.close
+              File.delete(io.path)
             end
-            results << reuslt
+            results << result
             unless(process.exit_code == 0)
               payload.set(:data, :nellie, :result, :failed, true)
             end
@@ -134,7 +135,7 @@ module Jackal
         script_path = File.join(nellie_cwd, nellie_script_name)
         if(File.exists?(script_path))
           begin
-            nellie_cmds = Bogo::Config.new(script_path).data
+            nellie_cmds = MultiJson.load(File.read(script_path)).to_smash #Bogo::Config.new(script_path).data
             debug "Nellie file is structured data. Populating commands into payload. (#{script_path})"
             payload[:data].set(:nellie, :commands, nellie_cmds[:commands])
             payload[:data].set(:nellie, :environment, nellie_cmds.fetch(:environment, {}))
@@ -157,7 +158,7 @@ module Jackal
       def fetch_code(payload)
         repository_path = File.join(
           working_directory,
-          payload.get(:data, :code_fetcher, :info, :asset)
+          payload.get(:data, :code_fetcher, :asset)
         )
         if(File.directory?(repository_path))
           warn "Existing path detected for repository unpack. Removing! (#{repository_path})"
@@ -165,13 +166,42 @@ module Jackal
         end
         FileUtils.mkdir_p(File.dirname(repository_path))
         asset_store.unpack(
-          asset_store.get(
-            payload.get(:data, :code_fetcher, :info, :asset),
-            repository_path,
-            :disable_overwrite
-          )
+          asset_store.get(payload.get(:data, :code_fetcher, :asset)),
+          repository_path,
+          :disable_overwrite
         )
         repository_path
+      end
+
+      # Message for successful results
+      #
+      # @param payload [Smash]
+      # @return [String]
+      def success_message(payload)
+        '[nellie]: Completion successful!'
+      end
+
+      # Message for failure results
+      #
+      # @param payload [Smash]
+      # @return [String]
+      def failure_message(payload)
+        msg = ['[nellie]: Failure encountered:']
+        msg << ''
+        failed_history = payload.fetch(:data, :nellie, :history, {}).detect do |i|
+          i[:exit_code] != 0
+        end
+        if(failed_history)
+          msg << '* STDOUT:' << '' << '```'
+          msg << asset_store.get(failed_history.get(:logs, :stdout)).read
+          msg << '```' << ''
+          msg << '* STDERR:' << '' << '```'
+          msg << asset_store.get(failed_history.get(:logs, :stderr)).read
+          msg << '```'
+        else
+          msg << '```' << 'Failed to locate logs' << '```'
+        end
+        msg.join("\n")
       end
 
     end
