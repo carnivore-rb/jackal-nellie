@@ -7,3 +7,4 @@ module Jackal
 end
 
 require 'jackal-nellie/version'
+require 'jackal-nellie/formatter'
