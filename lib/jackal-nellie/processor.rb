@@ -17,9 +17,11 @@ module Jackal
 
       # @return [String] working directory
       def working_directory
-        wd = config.fetch(:working_directory, DEFAULT_WORKING_DIRECTORY)
-        FileUtils.mkdir_p(wd)
-        wd
+        memoize(:working_directory) do
+          wd = config.fetch(:working_directory, DEFAULT_WORKING_DIRECTORY)
+          FileUtils.mkdir_p(wd)
+          wd
+        end
       end
 
       # @return [String] nellie command file name
@@ -70,13 +72,16 @@ module Jackal
           )
         )
         commands = [payload.get(:data, :nellie, :commands)].flatten.compact
-        results = run_commands(commands, process_environment, payload)
+        results = run_commands(commands, process_environment, payload, nellie_cwd)
         payload.set(:data, :nellie, :history, results)
         payload[:data][:nellie].delete(:commands)
         payload[:data][:nellie].delete(:environment)
         unless(payload.get(:data, :nellie, :result, :failed))
           payload.set(:data, :nellie, :result, :complete, true)
         end
+        payload.set(:data, :nellie, :status,
+          payload.get(:data, :nellie, :result, :complete) ? 'success' : 'error'
+        )
         true
       end
 
@@ -85,8 +90,9 @@ module Jackal
       # @param commands [Array<String>] commands to execute
       # @param env [Hash] environment variables for process
       # @param payload [Smash]
+      # @param process_cwd [String] working directory for process
       # @return [Array<Smash>] command results ({:start_time, :stop_time, :exit_code, :logs, :timed_out})
-      def run_commands(commands, env, payload)
+      def run_commands(commands, env, payload, process_cwd)
         results = []
         commands.each do |command|
           process_manager.process(payload[:id], command) do |process|
@@ -95,6 +101,7 @@ module Jackal
             stderr = process_manager.create_io_tmp(Celluloid.uuid, 'stderr')
             process.io.stdout = stdout
             process.io.stderr = stderr
+            process.cwd = process_cwd
             process.environment.replace(env.dup)
             process.leader = true
             result[:start_time] = Time.now.to_i
@@ -147,6 +154,7 @@ module Jackal
           end
           true
         else
+          debug "Failed to locate nellie command file at: #{script_path}"
           false
         end
       end
@@ -158,6 +166,7 @@ module Jackal
       def fetch_code(payload)
         repository_path = File.join(
           working_directory,
+          payload[:message_id],
           payload.get(:data, :code_fetcher, :asset)
         )
         if(File.directory?(repository_path))
@@ -171,37 +180,6 @@ module Jackal
           :disable_overwrite
         )
         repository_path
-      end
-
-      # Message for successful results
-      #
-      # @param payload [Smash]
-      # @return [String]
-      def success_message(payload)
-        '[nellie]: Completion successful!'
-      end
-
-      # Message for failure results
-      #
-      # @param payload [Smash]
-      # @return [String]
-      def failure_message(payload)
-        msg = ['[nellie]: Failure encountered:']
-        msg << ''
-        failed_history = payload.fetch(:data, :nellie, :history, {}).detect do |i|
-          i[:exit_code] != 0
-        end
-        if(failed_history)
-          msg << '* STDOUT:' << '' << '```'
-          msg << asset_store.get(failed_history.get(:logs, :stdout)).read
-          msg << '```' << ''
-          msg << '* STDERR:' << '' << '```'
-          msg << asset_store.get(failed_history.get(:logs, :stderr)).read
-          msg << '```'
-        else
-          msg << '```' << 'Failed to locate logs' << '```'
-        end
-        msg.join("\n")
       end
 
     end
