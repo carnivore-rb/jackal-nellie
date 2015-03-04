@@ -6,6 +6,8 @@ module Jackal
 
       class SlackComment < Jackal::Formatter
 
+        include MessageExtract
+
         # Source service
         SOURCE = :nellie
         # Destination service
@@ -15,21 +17,23 @@ module Jackal
         #
         # @param payload [Smash]
         def format(payload)
-          msgs = payload.fetch(:data, :slack, :messages, [])
-          if(payload.get(:data, :nellie, :result, :success))
-            msgs << Smash.new(
-              :description => 'Nellie job result:',
-              :message => success_message(payload),
-              :color => :good
-            )
-          else
-            msgs << Smash.new(
-              :description => 'Nellie job result:',
-              :message => failure_message(payload),
-              :color => :bad
-            )
+          if(payload.get(:data, :nellie, :result))
+            msgs = payload.fetch(:data, :slack, :messages, [])
+            if(payload.get(:data, :nellie, :result, :complete))
+              msgs << Smash.new(
+                :description => 'Nellie job result:',
+                :message => success_message(payload),
+                :color => :good
+              )
+            else
+              msgs << Smash.new(
+                :description => 'Nellie job result:',
+                :message => failure_message(payload),
+                :color => :bad
+              )
+            end
+            payload.set(:data, :slack, :messages, msgs)
           end
-          payload.set(:data, :slack, :messages, msgs)
         end
 
       end

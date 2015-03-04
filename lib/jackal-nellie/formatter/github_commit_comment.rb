@@ -6,6 +6,8 @@ module Jackal
 
       class GithubCommitComment < Jackal::Formatter
 
+        include MessageExtract
+
         # Source service
         SOURCE = :nellie
         # Destination service
