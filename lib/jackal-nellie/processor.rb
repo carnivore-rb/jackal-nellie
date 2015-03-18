@@ -176,8 +176,7 @@ module Jackal
         FileUtils.mkdir_p(File.dirname(repository_path))
         asset_store.unpack(
           asset_store.get(payload.get(:data, :code_fetcher, :asset)),
-          repository_path,
-          :disable_overwrite
+          repository_path
         )
         repository_path
       end
