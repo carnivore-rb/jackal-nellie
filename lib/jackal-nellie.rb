@@ -6,5 +6,7 @@ module Jackal
   end
 end
 
+Jackal.service(:nellie)
+
 require 'jackal-nellie/version'
 require 'jackal-nellie/formatter'
