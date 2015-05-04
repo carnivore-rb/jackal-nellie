@@ -6,7 +6,10 @@ module Jackal
   end
 end
 
-Jackal.service(:nellie)
+Jackal.service(
+  :nellie,
+  :description => 'Run commands'
+)
 
 require 'jackal-nellie/version'
 require 'jackal-nellie/formatter'
