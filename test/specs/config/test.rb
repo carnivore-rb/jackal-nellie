@@ -3,7 +3,6 @@ Configuration.new do
   jackal do
     require [
       "carnivore-actor",
-      "jackal-code-fetcher",
       "jackal-nellie"
     ]
 
@@ -14,22 +13,14 @@ Configuration.new do
           object_store_root '/tmp/jackal-assets'
         end
       end
-      bucket 'code-fetcher'
-    end
-
-    code_fetcher do
-      config { working_directory '/tmp/jackal-code-fetcher' }
-
-      sources do
-        input  { type 'actor' }
-        output { type 'spec' }
-      end
-
-      callbacks [ "Jackal::CodeFetcher::GitHub" ]
+      bucket 'nellie'
     end
 
     nellie do
-      config { working_directory '/tmp/nellie' }
+      config do
+        script_name 'NELLIE'
+        working_directory '/tmp/nellie'
+      end
 
       sources do
         input  { type 'actor' }

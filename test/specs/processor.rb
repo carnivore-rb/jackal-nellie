@@ -1,53 +1,49 @@
-require 'git'
-require 'jackal-code-fetcher'
+require 'jackal-assets'
+require 'jackal-nellie'
+require 'json'
 require 'pry'
+require 'tmpdir'
 
-describe Jackal::CodeFetcher::GitHub do
-  # Some of this is a shameful copy-paste job from jackal-code-fetcher
-  #  TODO: Look into way to reuse test code from other services
-  ASSET_OWNER = 'jackal'
-  ASSET_NAME  = 'test-repo'
-  # initial commit :)
-  COMMIT_SHA  = '2b3aa2cd43223498030daad2732a3e4d3d052cf5'
+describe Jackal::Nellie::Processor do
 
   before do
     @runner = run_setup(:test)
+    @mock_repo_path = Dir.mktmpdir
+    @mock_repo_file = "#{@mock_repo_path}/TOUCHED"
+    @script_name = service_config(:nellie, :script_name)
+    @asset_path = setup_asset
   end
 
   after do
     @runner.terminate if @runner && @runner.alive?
-    FileUtils.rm_rf(service_config(:code_fetcher, :working_directory))
-    FileUtils.rm_rf(@obj_store)
+    FileUtils.rm_rf(@asset_path)
+    FileUtils.rm_rf(@mock_repo_path)
   end
 
-  let(:fetcher_supervisor) { Carnivore::Supervisor.supervisor[:jackal_code_fetcher_input] }
-  let(:nellie_supervisor)  { Carnivore::Supervisor.supervisor[:jackal_nellie_input] }
+  let(:supervisor)  { Carnivore::Supervisor.supervisor[:jackal_nellie_input] }
 
   describe 'jackal code fetcher' do
     it 'fetches repo and stores as local asset' do
-      # TODO... cache repo fetching since we're testing nellie, not code-fetcher
-      payload = Jackal::Utils.new_payload('fetcher', code_fetcher_config)
-      fetcher_supervisor.transmit(payload)
-
-      source_wait(2) { !MessageStore.messages.empty? }
+      h = { :code_fetcher => { :asset => @asset_path } }
+      payload = Jackal::Utils.new_payload('nellie', h)
+      supervisor.transmit(payload)
+      source_wait { !MessageStore.messages.empty? }
       result = MessageStore.messages.first
 
-      @new_payload = Jackal::Utils.new_payload('nellie', result)
-      nellie_supervisor.transmit(@new_payload)
-
-      binding.pry
+      File.exists?(@mock_repo_file).must_equal true
     end
   end
 
   private
 
-  def code_fetcher_config
-    h = {:code_fetcher => {
-           :info => {
-             :url   => 'https://github.com/carnivore-rb/jackal-code-fetcher.git',
-             :owner => ASSET_OWNER,
-             :name  => ASSET_NAME,
-             :commit_sha => COMMIT_SHA }}}
+  def setup_asset
+    name = 'nellie.zip'
+    cmds = { commands: ["touch #{@mock_repo_file}"] }
+    File.write("#{@mock_repo_path}/#{@script_name}", cmds.to_json)
+    store = Jackal::Assets::Store.new
+    archive = store.pack(@mock_repo_path)
+    store.put(name, archive)
+    name
   end
 
   def service_config(name, *keys)
