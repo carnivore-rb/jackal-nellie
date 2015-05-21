@@ -10,6 +10,6 @@ Gem::Specification.new do |s|
   s.description = 'Just do stuff'
   s.require_path = 'lib'
   s.license = 'Apache 2.0'
-  s.add_dependency 'jackal'
+  s.add_dependency 'jackal', '>= 0.3.4', '< 1.0.0'
   s.files = Dir['lib/**/*'] + %w(jackal-nellie.gemspec README.md CHANGELOG.md CONTRIBUTING.md LICENSE)
 end
