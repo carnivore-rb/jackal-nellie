@@ -166,7 +166,7 @@ module Jackal
       def fetch_code(payload)
         repository_path = File.join(
           working_directory,
-          payload[:message_id],
+          payload[:id],
           payload.get(:data, :code_fetcher, :asset)
         )
         if(File.directory?(repository_path))
