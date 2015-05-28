@@ -17,19 +17,21 @@ module Jackal
         #
         # @param payload [Smash]
         def format(payload)
-          payload.set(:data, :github_kit, :commit_comment,
-            Smash.new(
-              :repository => [
-                payload.get(:data, :code_fetcher, :info, :name),
-                payload.get(:data, :code_fetcher, :info, :owner)
-              ].join('/'),
-              :reference => payload.get(:data, :code_fetcher, :info, :commit_sha)
+          if(payload.get(:data, :nellie, :result))
+            payload.set(:data, :github_kit, :commit_comment,
+              Smash.new(
+                :repository => [
+                  payload.get(:data, :code_fetcher, :info, :name),
+                  payload.get(:data, :code_fetcher, :info, :owner)
+                ].join('/'),
+                :reference => payload.get(:data, :code_fetcher, :info, :commit_sha)
+              )
             )
-          )
-          if(payload.get(:data, :nellie, :result, :success))
-            payload.set(:data, :github_kit, :commit_comment, :message, success_message(payload))
-          else
-            payload.set(:data, :github_kit, :commit_comment, :message, failure_message(payload))
+            if(payload.get(:data, :nellie, :result, :success))
+              payload.set(:data, :github_kit, :commit_comment, :message, success_message(payload))
+            else
+              payload.set(:data, :github_kit, :commit_comment, :message, failure_message(payload))
+            end
           end
         end
 
