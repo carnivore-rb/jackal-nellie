@@ -1,3 +1,7 @@
+# v0.1.8
+* Adjust jackal constraint
+* Use common uuid method from carnivore
+
 # v0.1.6
 * Add configurations to service registration
 
