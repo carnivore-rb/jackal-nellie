@@ -97,8 +97,8 @@ module Jackal
         commands.each do |command|
           process_manager.process(payload[:id], command) do |process|
             result = Smash.new
-            stdout = process_manager.create_io_tmp(Celluloid.uuid, 'stdout')
-            stderr = process_manager.create_io_tmp(Celluloid.uuid, 'stderr')
+            stdout = process_manager.create_io_tmp(Carnivore.uuid, 'stdout')
+            stderr = process_manager.create_io_tmp(Carnivore.uuid, 'stderr')
             process.io.stdout = stdout
             process.io.stderr = stderr
             process.cwd = process_cwd
