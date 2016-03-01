@@ -21,13 +21,13 @@ module Jackal
             payload.set(:data, :github_kit, :commit_comment,
               Smash.new(
                 :repository => [
-                  payload.get(:data, :code_fetcher, :info, :name),
-                  payload.get(:data, :code_fetcher, :info, :owner)
+                  payload.get(:data, :code_fetcher, :info, :owner),
+                  payload.get(:data, :code_fetcher, :info, :name)
                 ].join('/'),
                 :reference => payload.get(:data, :code_fetcher, :info, :commit_sha)
               )
             )
-            if(payload.get(:data, :nellie, :result, :success))
+            if(payload.get(:data, :nellie, :result, :complete))
               payload.set(:data, :github_kit, :commit_comment, :message, success_message(payload))
             else
               payload.set(:data, :github_kit, :commit_comment, :message, failure_message(payload))
