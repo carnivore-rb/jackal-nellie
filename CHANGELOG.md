@@ -1,3 +1,6 @@
+# v0.1.10
+* Fix github commit formatter
+
 # v0.1.8
 * Adjust jackal constraint
 * Use common uuid method from carnivore
