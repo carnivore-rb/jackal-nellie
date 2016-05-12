@@ -55,11 +55,7 @@ module Jackal
           else
             warn "No nellie commands found for execution on message! (#{message})"
           end
-          if(payload.get(:data, :nellie, :result, :failed))
-            failed(payload, message, 'Job failed to complete successfully.')
-          else
-            job_completed(:nellie, payload, message)
-          end
+          job_completed(:nellie, payload, message)
         end
       end
 
