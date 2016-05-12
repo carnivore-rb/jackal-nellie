@@ -17,7 +17,7 @@ module Jackal
         #
         # @param payload [Smash]
         def format(payload)
-          if(payload.get(:data, :nellie, :result))
+          if(payload.get(:data, :nellie, :status))
             payload.set(:data, :github_kit, :status,
               Smash.new(
                 :repository => [
@@ -25,12 +25,12 @@ module Jackal
                   payload.get(:data, :code_fetcher, :info, :name)
                 ].join('/'),
                 :reference => payload.get(:data, :code_fetcher, :info, :commit_sha),
-                :state => payload.get(:data, :nellie, :result, :failed) ? 'failure' : 'success',
+                :state => payload.get(:data, :nellie, :status) == 'success' ? 'success' : 'failure',
                 :extras => {
                   :context => 'nellie',
-                  :description => payload.get(:data, :nellie, :result, :failed) ?
-                    failure_message(payload) :
-                    success_message(payload)
+                  :description => payload.get(:data, :nellie, :status) == 'success' ?
+                    success_message(payload) :
+                    failure_message(payload)
                 }
               )
             )
