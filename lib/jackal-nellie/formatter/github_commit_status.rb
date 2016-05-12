@@ -29,8 +29,8 @@ module Jackal
                 :extras => {
                   :context => 'nellie',
                   :description => payload.get(:data, :nellie, :status) == 'success' ?
-                    success_message(payload) :
-                    failure_message(payload)
+                    'Nellie completed successfully' :
+                    'Nellie failed to complete'
                 }
               )
             )
