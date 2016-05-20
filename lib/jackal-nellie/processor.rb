@@ -167,7 +167,7 @@ module Jackal
         repository_path = File.join(
           working_directory,
           payload[:id],
-          payload.get(:data, :code_fetcher, :asset)
+          payload.get(:data, :code_fetcher, :asset).sub(/\..*$/, '')
         )
         if(File.directory?(repository_path))
           warn "Existing path detected for repository unpack. Removing! (#{repository_path})"
