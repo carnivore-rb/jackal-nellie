@@ -47,13 +47,18 @@ module Jackal
         failure_wrap(message) do |payload|
           debug "Processing nellie payload!"
           nellie_cwd = fetch_code(payload)
-          unless(payload.get(:data, :nellie, :commands))
-            extract_nellie_commands(nellie_cwd, payload)
-          end
-          if(payload.get(:data, :nellie, :commands))
-            execute_commands(nellie_cwd, payload)
-          else
-            warn "No nellie commands found for execution on message! (#{message})"
+          begin
+            unless(payload.get(:data, :nellie, :commands))
+              extract_nellie_commands(nellie_cwd, payload)
+            end
+            if(payload.get(:data, :nellie, :commands))
+              execute_commands(nellie_cwd, payload)
+            else
+              warn "No nellie commands found for execution on message! (#{message})"
+            end
+          ensure
+            debug "Removing nellie job working directory: `#{nellie_cwd}`"
+            FileUtils.rm_rf(nellie_cwd)
           end
           job_completed(:nellie, payload, message)
         end
@@ -76,13 +81,63 @@ module Jackal
         payload.set(:data, :nellie, :history, results)
         payload[:data][:nellie].delete(:commands)
         payload[:data][:nellie].delete(:environment)
+        if(payload.get(:data, :nellie, :cleanup))
+          debug "Cleanup commands detected. Running now."
+          cleanup_results = run_commands(payload[:data][:nellie].delete(:cleanup), process_environment, payload, nellie_cwd)
+          payload.set(:data, :nellie, :cleanup_history, cleanup_results)
+          debug "Cleanup commands have completed."
+        end
         unless(payload.get(:data, :nellie, :result, :failed))
           payload.set(:data, :nellie, :result, :complete, true)
+          if(payload.get(:data, :nellie, :release_assets))
+            set_github_release_assets(payload, nellie_cwd)
+          end
         end
         payload.set(:data, :nellie, :status,
           payload.get(:data, :nellie, :result, :complete) ? 'success' : 'error'
         )
         true
+      end
+
+      # Populate for pushing github release assets
+      #
+      # @param payload [Smash]
+      # @param nellie_cwd [String] working directory of repo
+      # @return [NilClass]
+      def set_github_release_assets(payload, nellie_cwd)
+        release_assets = Dir.glob(File.join(nellie_cwd, payload.get(:data, :nellie, :release_assets)))
+        unless(release_assets.empty?)
+          debug "Release assets detected: #{release_assets}"
+          release_asset_keys = release_assets.map do |asset|
+            asset_key = "nellie/release-assets/#{payload[:id]}/#{File.basename(asset)}"
+            asset_store.put(asset_key, File.open(asset, 'rb'))
+            asset_key
+          end
+          if(payload.get(:data, :code_fetcher, :info, :ref).to_s.include?('/tags/'))
+            version = payload.get(:data, :code_fetcher, :info, :ref).to_s.sub(/^.*\/tags\//, '')
+          else
+            version = payload.get(:data, :code_fetcher, :info, :commit_sha).to_s[0,6]
+            prerelease = true
+          end
+          payload.set(:data, :github_kit, :release,
+            Smash.new(
+              :repository => [
+                payload.get(:data, :code_fetcher, :info, :owner),
+                payload.get(:data, :code_fetcher, :info, :name)
+              ].join('/'),
+              :reference => payload.get(:data, :code_fetcher, :info, :commit_sha),
+              :tag_name => version,
+              :name => [
+                payload.get(:data, :code_fetcher, :info, :name),
+                version
+              ].join('-'),
+              :body => "Release - #{payload.get(:data, :code_fetcher, :info, :name)} <#{version}>",
+              :prerelease => prerelease,
+              :assets => release_asset_keys
+            )
+          )
+          nil
+        end
       end
 
       # Run collection of commands
@@ -94,11 +149,12 @@ module Jackal
       # @return [Array<Smash>] command results ({:start_time, :stop_time, :exit_code, :logs, :timed_out})
       def run_commands(commands, env, payload, process_cwd)
         results = []
+        stdout = process_manager.create_io_tmp(payload[:id], 'stdout')
+        stderr = process_manager.create_io_tmp(payload[:id], 'stderr')
         commands.each do |command|
           process_manager.process(payload[:id], command) do |process|
+            info "Running command `#{command}` in `#{process_cwd}`"
             result = Smash.new
-            stdout = process_manager.create_io_tmp(Carnivore.uuid, 'stdout')
-            stderr = process_manager.create_io_tmp(Carnivore.uuid, 'stderr')
             process.io.stdout = stdout
             process.io.stderr = stderr
             process.cwd = process_cwd
@@ -123,6 +179,8 @@ module Jackal
               io.close
               File.delete(io.path)
             end
+            info "Completed command `#{command}` in `#{process_cwd}`. " \
+              "Runtime: #{result[:stop_time] - result[:start_time]} seconds"
             results << result
             unless(process.exit_code == 0)
               payload.set(:data, :nellie, :result, :failed, true)
@@ -146,6 +204,8 @@ module Jackal
             debug "Nellie file is structured data. Populating commands into payload. (#{script_path})"
             payload[:data].set(:nellie, :commands, nellie_cmds[:commands])
             payload[:data].set(:nellie, :environment, nellie_cmds.fetch(:environment, {}))
+            payload[:data].set(:nellie, :cleanup, Array(nellie_cmds[:cleanup])) if nellie_cmds[:cleanup]
+            payload[:data].set(:nellie, :release_assets, nellie_cmds[:release]) if nellie_cmds[:release]
           rescue => e
             debug "Parsing nellie file failed. Assuming direct execution. (#{script_path})"
             payload[:data].set(:nellie, :commands,
@@ -174,10 +234,15 @@ module Jackal
           FileUtils.rm_rf(repository_path)
         end
         FileUtils.mkdir_p(File.dirname(repository_path))
+        code_asset = asset_store.get(payload.get(:data, :code_fetcher, :asset))
+        packed_code_asset_path = File.join(working_directory, "code-asset-#{payload[:id]}.zip")
+        FileUtils.cp(code_asset.path, packed_code_asset_path)
+        packed_code_asset = File.open(packed_code_asset_path, 'rb')
         asset_store.unpack(
-          asset_store.get(payload.get(:data, :code_fetcher, :asset)),
+          packed_code_asset,
           repository_path
         )
+        File.unlink(packed_code_asset_path)
         repository_path
       end
 
