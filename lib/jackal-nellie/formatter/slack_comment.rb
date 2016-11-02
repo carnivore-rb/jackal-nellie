@@ -21,13 +21,13 @@ module Jackal
             msgs = payload.fetch(:data, :slack, :messages, [])
             if(payload.get(:data, :nellie, :result, :complete))
               msgs << Smash.new(
-                :description => 'Nellie job result:',
+                :description => "#{app_config.fetch(:branding, :name, 'Nellie')} job result:",
                 :message => success_message(payload),
                 :color => :good
               )
             else
               msgs << Smash.new(
-                :description => 'Nellie job result:',
+                :description => "#{app_config.fetch(:branding, :name, 'Nellie')} job result:",
                 :message => failure_message(payload),
                 :color => :bad
               )

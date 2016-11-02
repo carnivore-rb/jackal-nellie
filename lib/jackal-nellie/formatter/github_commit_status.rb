@@ -29,8 +29,8 @@ module Jackal
                 :extras => {
                   :context => 'nellie',
                   :description => payload.get(:data, :nellie, :status) == 'success' ?
-                    'Nellie completed successfully' :
-                    'Nellie failed to complete'
+                    "#{app_config.fetch(:branding, :name, 'Nellie')} completed successfully" :
+                    "#{app_config.fetch(:branding, :name, 'Nellie')} failed to complete"
                 }
               )
             )
