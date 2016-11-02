@@ -13,7 +13,7 @@ module Jackal
             payload.get(:data, :code_fetcher, :info, :name)
           ].join('/')
           sha = payload.get(:data, :code_fetcher, :info, :commit_sha)
-          "[nellie]: Job completed successfully! (#{repo}@#{sha})"
+          "[#{app_config.fetch(:branding, :name, 'Nellie')}]: Job completed successfully! (#{repo}@#{sha})"
         end
 
         # Message for failure results
@@ -21,17 +21,23 @@ module Jackal
         # @param payload [Smash]
         # @return [String]
         def failure_message(payload)
-          msg = ['[nellie]: Failure encountered:']
+          msg = ["[#{app_config.fetch(:branding, :name, 'Nellie')}]: Failure encountered:"]
           msg << ''
           failed_history = payload.fetch(:data, :nellie, :history, {}).detect do |i|
             i[:exit_code] != 0
           end
           if(failed_history)
+            stdout = asset_store.get(failed_history.get(:logs, :stdout))
+            stdout_pos = stdout.size - 1024
+            stdout.seek(stdout_pos < 0 ? 0 : stdout_pos)
+            stderr = asset_store.get(failed_history.get(:logs, :stderr))
+            stderr_pos = stderr.size - 1034
+            stderr.seek(stderr_pos < 0 ? 0 : stderr_pos)
             msg << '* STDOUT:' << '' << '```'
-            msg << asset_store.get(failed_history.get(:logs, :stdout)).read
+            msg << stdout.read
             msg << '```' << ''
             msg << '* STDERR:' << '' << '```'
-            msg << asset_store.get(failed_history.get(:logs, :stderr)).read
+            msg << stderr.read
             msg << '```'
           else
             msg << '```' << 'Failed to locate logs' << '```'
